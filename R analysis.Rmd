@@ -1,0 +1,221 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+```{r}
+library(ggplot2)
+library(dplyr)
+library(tidyr)
+library(patchwork)
+library(tidyverse)
+library(stringr)
+```
+
+```{r}
+df_ks <- read.csv("C:/Users/Aldo Gadra/Documents/Data overview/Data project/Data/most_backed.csv")
+```
+
+goal_reached merupakan percentage total pledge dengan goal 
+```{r}
+df_ks <- df_ks %>%
+mutate(goal_reached = (amt.pledged / goal) * 100)
+```
+
+mutate category
+```{r}
+df_ks1 <- df_ks %>%
+  mutate(pleged_level = factor(ifelse(goal_reached>1000,"extremely high",
+                                "achieved")))
+```
+
+mutate average spending
+```{r}
+df_ks1 <- df_ks1 %>%
+  mutate(avg_pledge = amt.pledged/num.backers)
+```
+
+Hitung jumlah tier
+Convert ot list
+Eliminating {} - Terakhir di sini
+```{r}
+df_ks1 <- df_ks1 %>% mutate(pledge.tier = str_replace_all(pledge.tier, "\\*|\\[|\\]", ""))
+```
+
+Count num
+```{r}
+df_ks1 <- df_ks1 %>%
+  mutate(num.tiers = lengths(gregexpr(",", pledge.tier)) + 1)
+```
+
+Visualisasi dan EDA 
+1. Checkcing missing values 
+```{r}
+df_ks1 %>% is.na() %>% colSums()
+```
+```{r}
+df_ks1 = df_ks1[complete.cases(df_ks1),]
+```
+
+2. Missing Value 
+```{r}
+# Banyaknya sample original
+df_ks1 %>% nrow()
+```
+Disini ada jumlah row unik (distinct) kurang dari total jumlah baris -> ada dulpikat
+```{r}
+# Banyaknya sample setelah membuang filter
+df_ks1 %>% distinct(blurb) %>% nrow()
+```
+```{r}
+df_ks1 %>% 
+  group_by(blurb) %>% 
+  filter(n()>1) %>% 
+  arrange(blurb) 
+```
+Dropping duplicated category column 
+```{r}
+duplicated_ks = df_ks1 %>% 
+  group_by(blurb) %>% 
+  filter(n()>1) %>% 
+  distinct(blurb) %>% 
+  pull(blurb)
+
+df_ks1 = filter(df_ks1,! blurb %in% duplicated_ks)
+```
+
+```{r}
+unique(df_ks1[c("category")])
+```
+
+3. EDA 
+Random visualization (game related)
+```{r}
+df_ks1 %>%
+  filter(category %in% c("Games", "Gaming Hardware", "Video Games", "Tabletop Games")) %>%
+  ggplot() + 
+  geom_boxplot(aes(x =  category, y = num.backers, fill= category)) +
+  theme(legend.position="none") +
+  coord_flip() 
+```
+
+10 Jensi projcect dengan paling Pendaaan (pledged)
+```{r}
+df_ks1 %>%
+  group_by(category) %>%
+  summarise(n=sum(amt.pledged, na.rm=TRUE)) %>%
+  arrange(desc(n))%>%
+  head(10) %>%
+  ggplot(aes(x= reorder(category,n), y = n, fill=category)) + 
+  geom_col() +
+  coord_flip() +
+  scale_y_continuous(labels = scales::comma)
+```
+Number of Projects
+```{r}
+df_ks2 %>%
+  filter(pleged_level == "achieved")  %>%
+  ggplot(aes(x= category)) + 
+  geom_bar() +
+  coord_flip() 
+```
+Price boxplot
+```{r}
+df_ks2 %>%
+  filter(pleged_level == "achieved") %>%
+  ggplot() + 
+  geom_boxplot(aes(x =  category, y = goal, fill= category)) +
+  coord_flip()
+```
+Number of backers
+```{r}
+df_ks2 %>%
+  filter(pleged_level == "achieved") %>%
+  ggplot() + 
+  geom_boxplot(aes(x =  category, y = num.backers, fill= category)) +
+  coord_flip()
+```
+
+
+```{r}
+df_ks2 %>%
+  filter(pleged_level == "achieved") %>%
+  ggplot() + 
+  geom_boxplot(aes(x =  category, y = goal_reached, fill= category)) +
+  theme(legend.position="none") +
+  coord_flip() 
+```
+
+```{r}
+df_ks2 %>%
+  filter(pleged_level == "achieved") %>%
+  ggplot() + 
+  geom_boxplot(aes(x =  category, y = avg_pledge, fill= category)) +
+  theme(legend.position="none") +
+  coord_flip() 
+```
+```{r}
+df_ks2 %>%
+  filter(pleged_level == "achieved") %>%
+  ggplot() + 
+  geom_boxplot(aes(x =  category, y = avg_pledge, fill= category)) +
+  theme(legend.position="none") +
+  coord_flip() 
+```
+
+
+```{r}
+df_ks1 %>%
+  filter(category %in% c("Games", "Gaming Hardware", "Video Games", "Tabletop Games") & pleged_level == "extremely high") %>%
+  ggplot(aes(x =  num.backers, y = goal_reached)) +
+  geom_point(aes(colour= category)) +
+  geom_text(aes(label = by), check_overlap = TRUE)
+
+```
+ 
+```{r}
+df_ks1 %>%
+  filter(category %in% c("Games", "Gaming Hardware", "Video Games", "Tabletop Games") & pleged_level == "achieved") %>%
+  ggplot(aes(x =  avg_pledge, y = goal_reached)) +
+  geom_point(aes(colour= category)) +
+  geom_smooth(aes(colour= category),method = 'lm', se=FALSE)
+```
+# An exploration through the backers 
+```{r}
+df_ks2 %>%
+  filter(category %in% c("Product Design", "Tabletop Games", "Technology") & 
+  (pleged_level == "achieved")) %>%
+  ggplot(aes(x =  num.backers, y = goal_reached)) +
+  geom_point(aes(colour= category)) +
+  geom_smooth(aes(colour= category),method = 'lm', se=FALSE)
+```
+
+```{r}
+df_ks2 %>%
+  filter(category %in% c("Product Design", "Tabletop Games", "Technology") & 
+  (pleged_level == "achieved")) %>%
+  ggplot(aes(x =  num.backers, y = amt.pledged)) +
+  geom_point(aes(colour= category)) +
+  geom_smooth(aes(colour= category),method = 'lm', se=FALSE)
+```
+
+```{r}
+df_ks2 %>%
+  filter(category %in% c("Product Design", "Tabletop Games", "Technology", "Gadgets") &     pleged_level == "achieved") %>%
+  ggplot(aes(x =num.backers, y = goal)) +
+  geom_point(aes(colour= category)) +
+  geom_smooth(aes(colour= category),method = 'lm', se=FALSE)
+```
+
+
+Correlation [caetgorical]
+Using Differecnet Data 
+```{r}
+library(caTools)
+set.seed(123)
+sample_ks <- sample.split(df_ks2$admit_prob, SplitRatio = .80)
+train_ks <- subset(data, sample == TRUE)
+test_ks <- subset(data, sample == FALSE)
+```
+
+
